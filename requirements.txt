@@ -1,0 +1,8 @@
+numpy
+opencv-contrib-python
+pafy
+youtube_dl
+imutils
+pyqt5
+Pillow
+tqdm
