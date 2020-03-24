@@ -53,6 +53,11 @@ class Application:
         self.yadress.insert(0,'fdqOdTvGc9I')
         self.url = None
         self.yadress.pack(side=tk.LEFT, expand=False, padx=5, pady=5)
+
+        self.maxs = tk.Entry(self.tframeB, text="Maximum S")
+        self.maxs.insert(0, '500')
+        self.maxs.pack(side=tk.LEFT, expand=False, padx=5, pady=5)
+
         self.isPause = True
         # Tracker
         self.buf = {}  # current frame from stream
@@ -177,7 +182,7 @@ class Application:
             self.buf['countur_n'] = 0
             (x, y, w, h) = cv2.boundingRect(contour)
             s = cv2.contourArea(contour)
-            if s < 50 or s > 1000:
+            if s < 50 or s > int(self.maxs.get()):
                 continue
             self.buf['contoursFilered'].append((x, y, w, h))
             cv2.rectangle(self.buf['frame_contur'], (x , y), (x + w, y + h), (0, 255, 255), 2)
@@ -221,7 +226,7 @@ class Application:
 
     def __drawrect(self,img,cont,color):
         (x, y, w, h) = cont
-        crop_img = img[y:y + h, x:x + w].copy()
+        crop_img = self.buf['frame1'][y:y + h, x:x + w].copy() #crop from clear image
         #crop_img = cv2.resize(crop_img, ((w) * 2, (h) * 2))
         cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
         return img.copy(),crop_img.copy()
