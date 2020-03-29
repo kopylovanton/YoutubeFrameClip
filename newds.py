@@ -5,12 +5,13 @@ import pafy
 import cv2
 print('cv2 version',cv2.__version__)
 import tkinter as tk
+import tkinter.ttk as ttk
 
 from  PIL import Image, ImageTk
 import datetime
 import os
 import pickle
-
+import math
 
 class Application:
     def __init__(self):
@@ -58,6 +59,10 @@ class Application:
         self.maxs.insert(0, '500')
         self.maxs.pack(side=tk.LEFT, expand=False, padx=5, pady=5)
 
+        # self.currf = tk.Entry(self.tframeB, text="Current time")
+        # self.currf.insert(0, '1')
+        # self.currf.pack(side=tk.LEFT, expand=False, padx=5, pady=5)
+
         self.isPause = True
         # Tracker
         self.buf = {}  # current frame from stream
@@ -95,6 +100,10 @@ class Application:
         self.frame_width = int(self.vs.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.frame_height = int(self.vs.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.fps = int(self.vs.get(cv2.CAP_PROP_FPS))
+        self.flength = int(self.vs.get(cv2.CAP_PROP_FRAME_COUNT))
+        #self.progress = ttk.Progressbar(self.tframeB, orient=tk.HORIZONTAL, maximum=self.flength//(self.fps*60), mode='determinate')
+        #self.progress.pack()
+        #self.countf=0
     def keyevent(self, event):
         if event.char == ' ':
             self.pause()
@@ -131,6 +140,9 @@ class Application:
             if self.url != str(self.yadress.get()):
                 self.url = str(self.yadress.get())
                 self.startVS()
+            # # Number 2 defines flag CV_CAP_PROP_POS_FRAMES which is a 0-based index of the frame to be decoded/captured next.
+            # # The second argument defines the frame number in range 0.0-1.0
+            # self.vs.set(2, frame_no);
         else:
             #self.yadress.config(state=tk.NORMAL)
             self.btnp["text"] = "Resume!"
@@ -150,27 +162,62 @@ class Application:
                 self.take_snapshot()
             self.pause()
     def countur(self):
+        #grab
         if type(self.buf['frame1']) == type(None):
             ret, self.buf['frame1'] = self.vs.read()
+            #self.buf['frame2'] = self.vs.grab()
+            ret, self.buf['frame2'] = self.vs.read()
         else:
             self.buf['frame1'] = self.buf['frame2'].copy()
+            self.buf['frame2'] = self.buf['frame3'].copy()
 
-        ret, self.buf['frame2'] = self.vs.read()
+        #self.buf['frame3'] = self.vs.grab()
+        ret, self.buf['frame3'] = self.vs.read()
 
-        diff = cv2.absdiff(self.buf['frame1'], self.buf['frame2'])
-        diff = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
-        diff = cv2.blur(diff, (10, 10))
-        _, diff = cv2.threshold(diff, 20, 255, cv2.THRESH_BINARY)
+        diffm1=cv2.absdiff(cv2.cvtColor(self.buf['frame2'], cv2.COLOR_BGR2GRAY), cv2.cvtColor(self.buf['frame1'], cv2.COLOR_BGR2GRAY))
+        diff=cv2.absdiff(cv2.cvtColor(self.buf['frame3'], cv2.COLOR_BGR2GRAY), cv2.cvtColor(self.buf['frame1'], cv2.COLOR_BGR2GRAY))
+        diffp1=cv2.absdiff(cv2.cvtColor(self.buf['frame2'], cv2.COLOR_BGR2GRAY), cv2.cvtColor(self.buf['frame3'], cv2.COLOR_BGR2GRAY))
+
+        # diffm1 = cv2.blur(diffm1, (10, 10))
+        # diff = cv2.blur(diff, (10, 10))
+        # diffp1 = cv2.blur(diffp1, (10, 10))
+
+        sp = cv2.meanStdDev(diffp1)
+        sm = cv2.meanStdDev(diffm1)
+        s0 = cv2.meanStdDev(diff)
+        #print("E(d+):", sp, "\nE(d-):", sm, "\nE(d0):", s0)
+
+        # th = [
+        #     sp[0][0, 0] + 3 * math.sqrt(sp[1][0, 0]),
+        #     sm[0][0, 0] + 3 * math.sqrt(sm[1][0, 0]),
+        #     s0[0][0, 0] + 3 * math.sqrt(s0[1][0, 0]),
+        # ]
+
+        ret, dbp = cv2.threshold(diffp1, 10, 255, cv2.THRESH_BINARY)
+        ret, dbm = cv2.threshold(diffm1, 10, 255, cv2.THRESH_BINARY)
+        ret, db0 = cv2.threshold(diff, 10, 255, cv2.THRESH_BINARY)
+        detect = cv2.bitwise_not(
+            cv2.bitwise_not(cv2.bitwise_and(dbm, db0),
+                            dbp))
+        #diff=detect
+        diff = cv2.bitwise_not(detect)
+        # num, labels, stats, centroids = cv2.connectedComponentsWithStats(nd, ltype=cv2.CV_16U)
+
+        # diff = cv2.absdiff(self.buf['frame1'], self.buf['frame2'])
+        # diff = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
+        # diff = cv2.blur(diff, (10, 10))
+        # _, diff = cv2.threshold(diff, 20, 255, cv2.THRESH_BINARY)
 
 
         # grey1 = cv2.cvtColor(self.buf['frame1'], cv2.COLOR_BGR2GRAY)
         # diff = self.backSub.apply(grey1)
-        # diff=cv2.blur(diff,(10,10))
+        #diff=cv2.blur(diff,(10,10))
         # _, diff = cv2.threshold(diff, 20, 255, cv2.THRESH_BINARY)
 
-        # kernel = cv2.getStructuringElement(shape=cv2.MORPH_ELLIPSE, ksize=(5, 5))
-        # diff = cv2.morphologyEx(diff, cv2.MORPH_CLOSE, kernel, iterations=7)
-        diff = cv2.dilate(diff, None, iterations=3)
+        #kernel = cv2.getStructuringElement(shape=cv2.MORPH_ELLIPSE, ksize=(5, 5))
+        #diff = cv2.morphologyEx(diff, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+        #diff = cv2.dilate(diff, None, iterations=1)
 
         contours, _ = cv2.findContours(diff, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         self.buf['contoursFilered'] = []
@@ -188,6 +235,9 @@ class Application:
             cv2.rectangle(self.buf['frame_contur'], (x , y), (x + w, y + h), (0, 255, 255), 2)
             # cv2.putText(self.buf['frame_contur'], "s={}".format(str(s)), (x + w + 5, y), cv2.FONT_HERSHEY_SIMPLEX,
             #             0.5, (0, 255, 255), 3)
+        #self.countf+=1
+        #self.progress['value'] = int(self.countf//(self.fps*60))
+        #self.root.update_idletasks()
     def tracknext(self,frame):
         # check to see if we are currently tracking an object
         if self.buf['initBB'] is not None:
