@@ -229,7 +229,7 @@ class Application:
             self.buf['countur_n'] = 0
             (x, y, w, h) = cv2.boundingRect(contour)
             s = cv2.contourArea(contour)
-            if s < 50 or s > int(self.maxs.get()):
+            if s < 50 or s > int(self.maxs.get()) or (h/w)>2 or (w/h)>2:
                 continue
             self.buf['contoursFilered'].append((x, y, w, h))
             cv2.rectangle(self.buf['frame_contur'], (x , y), (x + w, y + h), (0, 255, 255), 2)
