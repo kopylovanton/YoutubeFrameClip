@@ -75,6 +75,7 @@ class Application:
 
         # start a self.video_loop that constantly pools the video sensor
         # for the most recently read frame
+        self.backSub = cv2.createBackgroundSubtractorKNN()
         self.video_loop()
 
     def startVS(self):
@@ -134,12 +135,16 @@ class Application:
             #self.pause()
     def pause(self):
         if self.isPause:
-            self.btnp["text"] = "Pause!"
-            self.isPause = False
-            self.yadress.config(state = 'readonly')
             if self.url != str(self.yadress.get()):
                 self.url = str(self.yadress.get())
                 self.startVS()
+                ret, _ = self.vs.read()
+            else:
+                ret = True
+            if ret:
+                self.btnp["text"] = "Pause!"
+                self.isPause = False
+                self.yadress.config(state='readonly')
             # # Number 2 defines flag CV_CAP_PROP_POS_FRAMES which is a 0-based index of the frame to be decoded/captured next.
             # # The second argument defines the frame number in range 0.0-1.0
             # self.vs.set(2, frame_no);
@@ -164,6 +169,7 @@ class Application:
     def countur(self):
         #grab
         if type(self.buf['frame1']) == type(None):
+            #ret, self.buf['frame1'] = self.vs.read()
             ret, self.buf['frame1'] = self.vs.read()
             #self.buf['frame2'] = self.vs.grab()
             ret, self.buf['frame2'] = self.vs.read()
@@ -173,34 +179,30 @@ class Application:
 
         #self.buf['frame3'] = self.vs.grab()
         ret, self.buf['frame3'] = self.vs.read()
-
+        if not ret:
+            return False
         diffm1=cv2.absdiff(cv2.cvtColor(self.buf['frame2'], cv2.COLOR_BGR2GRAY), cv2.cvtColor(self.buf['frame1'], cv2.COLOR_BGR2GRAY))
         diff=cv2.absdiff(cv2.cvtColor(self.buf['frame3'], cv2.COLOR_BGR2GRAY), cv2.cvtColor(self.buf['frame1'], cv2.COLOR_BGR2GRAY))
-        diffp1=cv2.absdiff(cv2.cvtColor(self.buf['frame2'], cv2.COLOR_BGR2GRAY), cv2.cvtColor(self.buf['frame3'], cv2.COLOR_BGR2GRAY))
+        #diffsub = self.backSub.apply(cv2.cvtColor(self.buf['frame1'], cv2.COLOR_BGR2GRAY))
+        #diffp1=cv2.absdiff(cv2.cvtColor(self.buf['frame2'], cv2.COLOR_BGR2GRAY), cv2.cvtColor(self.buf['frame3'], cv2.COLOR_BGR2GRAY))
 
-        # diffm1 = cv2.blur(diffm1, (10, 10))
-        # diff = cv2.blur(diff, (10, 10))
-        # diffp1 = cv2.blur(diffp1, (10, 10))
-
-        sp = cv2.meanStdDev(diffp1)
-        sm = cv2.meanStdDev(diffm1)
-        s0 = cv2.meanStdDev(diff)
-        #print("E(d+):", sp, "\nE(d-):", sm, "\nE(d0):", s0)
-
-        # th = [
-        #     sp[0][0, 0] + 3 * math.sqrt(sp[1][0, 0]),
-        #     sm[0][0, 0] + 3 * math.sqrt(sm[1][0, 0]),
-        #     s0[0][0, 0] + 3 * math.sqrt(s0[1][0, 0]),
-        # ]
-
-        ret, dbp = cv2.threshold(diffp1, 10, 255, cv2.THRESH_BINARY)
+        #ret, dbp = cv2.threshold(diffp1, 10, 255, cv2.THRESH_BINARY)
+        #ret, dbs = cv2.threshold(diffsub, 10, 255, cv2.THRESH_BINARY)
         ret, dbm = cv2.threshold(diffm1, 10, 255, cv2.THRESH_BINARY)
         ret, db0 = cv2.threshold(diff, 10, 255, cv2.THRESH_BINARY)
-        detect = cv2.bitwise_not(
-            cv2.bitwise_not(cv2.bitwise_and(dbm, db0),
-                            dbp))
-        #diff=detect
-        diff = cv2.bitwise_not(detect)
+        # detect = cv2.bitwise_not(
+        #     cv2.bitwise_not(cv2.bitwise_and(dbm, db0),
+        #                     dbp))
+        # diff = cv2.bitwise_not(detect)
+
+        # detectfast = cv2.bitwise_not(cv2.bitwise_and(cv2.bitwise_and(dbm, db0),
+        #         #                             cv2.bitwise_not(dbp)))
+        detectfast = cv2.bitwise_and(dbm, db0)
+        difffast=detectfast
+        #difffast = cv2.bitwise_not(detectfast)
+        num, labels, statsfast, centroids = cv2.connectedComponentsWithStats(difffast, ltype=cv2.CV_16U)
+        #contoursfast, _ = cv2.findContours(difffast, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        #contours, _ = cv2.findContours(diff, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         # num, labels, stats, centroids = cv2.connectedComponentsWithStats(nd, ltype=cv2.CV_16U)
 
         # diff = cv2.absdiff(self.buf['frame1'], self.buf['frame2'])
@@ -219,20 +221,40 @@ class Application:
 
         #diff = cv2.dilate(diff, None, iterations=1)
 
-        contours, _ = cv2.findContours(diff, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         self.buf['contoursFilered'] = []
         self.buf['countur_n']=-1
         self.buf['frame_contur'] = self.buf['frame1'].copy()
         if self.buf['initBB'] is not None:
             self.tracknext(self.buf['frame_contur'])
-        for contour in contours:
-            self.buf['countur_n'] = 0
-            (x, y, w, h) = cv2.boundingRect(contour)
-            s = cv2.contourArea(contour)
+        # def conturlambda(contour):
+        #     (x, y, w, h) = cv2.boundingRect(contour)
+        #     s = cv2.contourArea(contour)
+        #     if s < 50 or s > int(self.maxs.get()) or (h/w)>2 or (w/h)>2:
+        #         pass
+        #     else:
+        #         self.buf['contoursFilered'].append((x, y, w, h))
+        #         cv2.rectangle(self.buf['frame_contur'], (x , y), (x + w, y + h), rectcolor, 2)
+
+        def statslambda(stat):
+            s = stat[cv2.CC_STAT_AREA]
+            (x, y, w, h) = (stat[cv2.CC_STAT_LEFT], stat[cv2.CC_STAT_TOP],stat[cv2.CC_STAT_WIDTH],stat[cv2.CC_STAT_HEIGHT])
             if s < 50 or s > int(self.maxs.get()) or (h/w)>2 or (w/h)>2:
-                continue
-            self.buf['contoursFilered'].append((x, y, w, h))
-            cv2.rectangle(self.buf['frame_contur'], (x , y), (x + w, y + h), (0, 255, 255), 2)
+                pass
+            else:
+                self.buf['contoursFilered'].append((x, y, w, h))
+                cv2.rectangle(self.buf['frame_contur'], (x , y), (x + w, y + h), rectcolor, 2)
+
+        rectcolor = (0, 255, 255)
+        # for contour in contoursfast:
+        #     conturlambda(contour)
+        # rectcolor = (0, 0, 255)
+        for stat in statsfast:
+            statslambda(stat)
+
+        if len(self.buf['contoursFilered'])>0:
+            self.buf['countur_n'] = 0
+        return True
+
             # cv2.putText(self.buf['frame_contur'], "s={}".format(str(s)), (x + w + 5, y), cv2.FONT_HERSHEY_SIMPLEX,
             #             0.5, (0, 255, 255), 3)
         #self.countf+=1
@@ -270,8 +292,8 @@ class Application:
 
     def video_loop(self):
         if not self.isPause:
-            self.countur()
-            self.schow_frame(self.buf['frame_contur'],self.panel)
+            if self.countur():
+                self.schow_frame(self.buf['frame_contur'],self.panel)
         self.root.after(10, self.video_loop)  # call the same function after 30 milliseconds
 
     def __drawrect(self,img,cont,color):
