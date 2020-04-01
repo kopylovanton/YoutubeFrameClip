@@ -5,13 +5,14 @@ import pafy
 import cv2
 print('cv2 version',cv2.__version__)
 import tkinter as tk
-import tkinter.ttk as ttk
+#import tkinter.ttk as ttk
 
 from  PIL import Image, ImageTk
 import datetime
-import os
+#import os
 import pickle
-import math
+#import math
+import numpy as np
 
 class Application:
     def __init__(self):
@@ -173,34 +174,32 @@ class Application:
             ret, self.buf['frame1'] = self.vs.read()
             #self.buf['frame2'] = self.vs.grab()
             ret, self.buf['frame2'] = self.vs.read()
+            ret, self.buf['frame3'] = self.vs.read()
         else:
             self.buf['frame1'] = self.buf['frame2'].copy()
             self.buf['frame2'] = self.buf['frame3'].copy()
+            self.buf['frame3'] = self.buf['frame4'].copy()
 
         #self.buf['frame3'] = self.vs.grab()
-        ret, self.buf['frame3'] = self.vs.read()
+        ret, self.buf['frame4'] = self.vs.read()
         if not ret:
             return False
         diffm1=cv2.absdiff(cv2.cvtColor(self.buf['frame2'], cv2.COLOR_BGR2GRAY), cv2.cvtColor(self.buf['frame1'], cv2.COLOR_BGR2GRAY))
-        diff=cv2.absdiff(cv2.cvtColor(self.buf['frame3'], cv2.COLOR_BGR2GRAY), cv2.cvtColor(self.buf['frame1'], cv2.COLOR_BGR2GRAY))
-        #diffsub = self.backSub.apply(cv2.cvtColor(self.buf['frame1'], cv2.COLOR_BGR2GRAY))
-        #diffp1=cv2.absdiff(cv2.cvtColor(self.buf['frame2'], cv2.COLOR_BGR2GRAY), cv2.cvtColor(self.buf['frame3'], cv2.COLOR_BGR2GRAY))
+        diff=cv2.absdiff(cv2.cvtColor(self.buf['frame4'], cv2.COLOR_BGR2GRAY), cv2.cvtColor(self.buf['frame1'], cv2.COLOR_BGR2GRAY))
+        diffp1=cv2.absdiff(cv2.cvtColor(self.buf['frame2'], cv2.COLOR_BGR2GRAY), cv2.cvtColor(self.buf['frame3'], cv2.COLOR_BGR2GRAY))
 
-        #ret, dbp = cv2.threshold(diffp1, 10, 255, cv2.THRESH_BINARY)
-        #ret, dbs = cv2.threshold(diffsub, 10, 255, cv2.THRESH_BINARY)
+        ret, dbp = cv2.threshold(diffp1, 10, 255, cv2.THRESH_BINARY)
         ret, dbm = cv2.threshold(diffm1, 10, 255, cv2.THRESH_BINARY)
         ret, db0 = cv2.threshold(diff, 10, 255, cv2.THRESH_BINARY)
-        # detect = cv2.bitwise_not(
-        #     cv2.bitwise_not(cv2.bitwise_and(dbm, db0),
-        #                     dbp))
-        # diff = cv2.bitwise_not(detect)
+        diff =cv2.bitwise_and(dbm, db0)
 
-        # detectfast = cv2.bitwise_not(cv2.bitwise_and(cv2.bitwise_and(dbm, db0),
-        #         #                             cv2.bitwise_not(dbp)))
-        detectfast = cv2.bitwise_and(dbm, db0)
-        difffast=detectfast
-        #difffast = cv2.bitwise_not(detectfast)
-        num, labels, statsfast, centroids = cv2.connectedComponentsWithStats(difffast, ltype=cv2.CV_16U)
+        num, labels, stats, centroids = cv2.connectedComponentsWithStats(diff, ltype=cv2.CV_16U,connectivity=8)
+
+        difffast = cv2.bitwise_and(cv2.bitwise_and(dbm, db0),
+                                      cv2.bitwise_not(dbp))
+        numf, labelsf, statsf, centroidsf = cv2.connectedComponentsWithStats(difffast, ltype=cv2.CV_16U,connectivity=8)
+
+
         #contoursfast, _ = cv2.findContours(difffast, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         #contours, _ = cv2.findContours(diff, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         # num, labels, stats, centroids = cv2.connectedComponentsWithStats(nd, ltype=cv2.CV_16U)
@@ -234,25 +233,35 @@ class Application:
         #     else:
         #         self.buf['contoursFilered'].append((x, y, w, h))
         #         cv2.rectangle(self.buf['frame_contur'], (x , y), (x + w, y + h), rectcolor, 2)
-
+        fm=np.zeros((self.frame_width,self.frame_height),np.int16)
         def statslambda(stat):
             s = stat[cv2.CC_STAT_AREA]
             (x, y, w, h) = (stat[cv2.CC_STAT_LEFT], stat[cv2.CC_STAT_TOP],stat[cv2.CC_STAT_WIDTH],stat[cv2.CC_STAT_HEIGHT])
             if s < 50 or s > int(self.maxs.get()) or (h/w)>2 or (w/h)>2:
                 pass
             else:
-                self.buf['contoursFilered'].append((x, y, w, h))
-                cv2.rectangle(self.buf['frame_contur'], (x , y), (x + w, y + h), rectcolor, 2)
-
-        rectcolor = (0, 255, 255)
+                if fm[x, y] > 0:
+                    for l in enumerate(self.buf['contoursFilered']):
+                        if (x, y, w, h) == l[1]:
+                            fm[x, y] += 1
+                            break
+                elif fm[x, y] == 0:
+                    fm[x, y] += 1
+                    self.buf['contoursFilered'].append((x, y, w, h))
         # for contour in contoursfast:
         #     conturlambda(contour)
         # rectcolor = (0, 0, 255)
-        for stat in statsfast:
+        for stat in stats:
             statslambda(stat)
-
-        if len(self.buf['contoursFilered'])>0:
-            self.buf['countur_n'] = 0
+        for stat in statsf:
+            statslambda(stat)
+        for l in enumerate(self.buf['contoursFilered']):
+            (x, y, w, h)=l[1]
+            if fm[x,y]==1:
+                rectcolor = (0, 255, 255)
+            else:
+                rectcolor = (0, 0, 255)
+            cv2.rectangle(self.buf['frame_contur'], (x, y), (x + w, y + h), rectcolor, 2)
         return True
 
             # cv2.putText(self.buf['frame_contur'], "s={}".format(str(s)), (x + w + 5, y), cv2.FONT_HERSHEY_SIMPLEX,
