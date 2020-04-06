@@ -17,6 +17,7 @@
 требуемые модули для python 3.7 перечислены в файле requirements.txt
 newds.py основной исполняемый файл
 Browseds.py простой браузер полученных файлов изображений
+TL.ipynb transfer learning notebook для полученных данных на основе TF Keras MobilenetV2
 
 -- примеры
 Волейбол fdqOdTvGc9I (https://www.youtube.com/watch?v=fdqOdTvGc9I)
