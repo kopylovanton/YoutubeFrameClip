@@ -37,32 +37,44 @@ class Application:
         self.tframeF.pack(side=tk.LEFT,fill=tk.BOTH)
         self.panelF = tk.Label(self.tframeF)  # initialize image panel
         self.panelF.pack(padx=10, pady=10)
-
-        # create a button, that when pressed, will take the current frame and save it to file
-        # create a button, that when pressed, will take the current frame and save it to file
-        self.btnt = tk.Button(self.tframeB, text="TrackIt!", command=self.trackit, height = 5,width = 10)
-        self.btnt.pack(side=tk.RIGHT, expand=False, padx=5, pady=5)
-        self.btnt = tk.Button(self.tframeB, text="Save!", command=self.take_snapshot, height = 5,width = 10)
-        self.btnt.pack(side=tk.RIGHT, expand=False, padx=5, pady=5)
-        # create a button, that when pressed, will take the current frame and save it to file
-        self.btnt = tk.Button(self.tframeB, text="PICK!", command=self.pick, height = 5,width = 10)
-        self.btnt.pack(side=tk.LEFT, expand=False, padx=5, pady=5)
-        self.btn = tk.Button(self.tframeB, text="Next!", command=self.countur_loop, height = 5,width = 10)
-        self.btn.pack(side=tk.LEFT, expand=False, padx=5, pady=5)
-        self.btnp = tk.Button(self.tframeB, text="Start!", command=self.pause, height = 5,width = 10)
-        self.btnp.pack(side=tk.LEFT, expand=False, padx=5, pady=5)
+# url
+        tk.Label(self.tframeB, text="Youtube IDT:").grid(row=0)
         self.yadress = tk.Entry(self.tframeB, text="Youtube IDT")
         self.yadress.insert(0,'fdqOdTvGc9I')
         self.url = None
-        self.yadress.pack(side=tk.LEFT, expand=False, padx=5, pady=5)
-
+        self.yadress.grid(row=0, column=1)
+#max area
+        tk.Label(self.tframeB, text="Max area:").grid(row=0, column=2)
         self.maxs = tk.Entry(self.tframeB, text="Maximum S")
         self.maxs.insert(0, '500')
-        self.maxs.pack(side=tk.LEFT, expand=False, padx=5, pady=5)
-
+        self.maxs.grid(row=0, column=3)
+#start frame
+        # tk.Label(self.tframeB, text="Start from 10%:").grid(row=0, column=4)
         # self.currf = tk.Entry(self.tframeB, text="Current time")
-        # self.currf.insert(0, '1')
-        # self.currf.pack(side=tk.LEFT, expand=False, padx=5, pady=5)
+        # self.currf.insert(0, '0.1')
+        # self.currf .grid(row=0, column=5)
+
+        tk.Label(self.tframeB, text=" ").grid(row=1)
+# start btn
+        self.btnp = tk.Button(self.tframeB, text="Start(space)!", command=self.pause, height=2, width=10)
+        self.btnp.grid(row=2)
+# PICK btn
+        self.btnt = tk.Button(self.tframeB, text="PICK(d)!", command=self.pick, height=2, width=10)
+        self.btnt.grid(row=2, column=1)
+#Save btn
+        self.btnt = tk.Button(self.tframeB, text="Save File(s)!", command=self.take_snapshot, height=2, width=10)
+        self.btnt.grid(row=2, column=2)
+#Next btn
+        self.btn = tk.Button(self.tframeB, text="Next Frame!", command=self.countur_loop, height=2, width=10)
+        self.btn.grid(row=2, column=3)
+# STEP btn
+        self.btns = tk.Button(self.tframeB, text="Skip Frame!", command=self.steps, height=2, width=10)
+        self.btns.grid(row=2, column=4)
+        self.stepf=1
+# #Track btn
+#         self.btnt = tk.Button(self.tframeB, text="TrackIt!", command=self.trackit, height=2, width=10)
+#         self.btnt.grid(row=2, column=5)
+
 
         self.isPause = True
         # Tracker
@@ -103,15 +115,18 @@ class Application:
         self.frame_height = int(self.vs.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.fps = int(self.vs.get(cv2.CAP_PROP_FPS))
         self.flength = int(self.vs.get(cv2.CAP_PROP_FRAME_COUNT))
+        _, frame = self.vs.read()
+        self.framec = 1
+        #self.vs.set(cv2.CAP_PROP_POS_FRAMES, float(self.currf.get()));
         #self.progress = ttk.Progressbar(self.tframeB, orient=tk.HORIZONTAL, maximum=self.flength//(self.fps*60), mode='determinate')
         #self.progress.pack()
         #self.countf=0
     def keyevent(self, event):
         if event.char == ' ':
             self.pause()
-        if event.char == 's':
+        if event.char in ('s','S'):
             self.pick()
-        if event.char == 'd':
+        if event.char in ('d','D'):
             self.take_snapshot()
     def Button1(self,event):
         if self.isPause:
@@ -134,6 +149,15 @@ class Application:
                         self.schow_frame(img2, self.panel)
                         break
             #self.pause()
+
+    def steps(self):
+        if self.stepf==1:
+            self.btns["text"] = "Skip 100x!"
+            self.stepf = 100
+        else:
+            self.btns["text"] = "Speed Frame!"
+            self.stepf = 1
+
     def pause(self):
         if self.isPause:
             if self.url != str(self.yadress.get()):
@@ -168,7 +192,11 @@ class Application:
                 self.take_snapshot()
             self.pause()
     def countur(self):
-        #grab
+        if self.framec % self.stepf !=0:
+            _ = self.vs.grab()
+            self.framec += 1
+            return True
+        self.framec += 1
         if type(self.buf['frame1']) == type(None):
             #ret, self.buf['frame1'] = self.vs.read()
             ret, self.buf['frame1'] = self.vs.read()
@@ -303,7 +331,7 @@ class Application:
         if not self.isPause:
             if self.countur():
                 self.schow_frame(self.buf['frame_contur'],self.panel)
-        self.root.after(10, self.video_loop)  # call the same function after 30 milliseconds
+        self.root.after(1, self.video_loop)  # call the same function after 10 milliseconds
 
     def __drawrect(self,img,cont,color):
         (x, y, w, h) = cont
