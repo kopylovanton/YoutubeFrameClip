@@ -124,9 +124,9 @@ class Application:
     def keyevent(self, event):
         if event.char == ' ':
             self.pause()
-        if event.char in ('s','S'):
-            self.pick()
         if event.char in ('d','D'):
+            self.pick()
+        if event.char in ('s','S'):
             self.take_snapshot()
     def Button1(self,event):
         if self.isPause:
