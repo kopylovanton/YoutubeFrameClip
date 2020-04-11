@@ -48,7 +48,7 @@ class Application:
 
         img = self.data[self.cnt][1]
         if self.data[self.cnt][0]==1:
-            clr=(0,255,255)
+            clr=(0,255,0)
         else:
             clr = (0, 0, 255)
         img = cv2.resize(img, (400, 400))
@@ -62,8 +62,7 @@ class Application:
 
 
     def schow_frame(self,cv2image,panel):
-        # cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)  # convert colors from BGR to RGBA
-
+        cv2image = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGBA)  # convert colors from BGR to RGBA
         self.current_image = Image.fromarray(cv2image)  # convert image for PIL
         imgtk = ImageTk.PhotoImage(image=self.current_image)  # convert image for tkinter
         panel.imgtk = imgtk  # anchor imgtk so it does not be deleted by garbage-collector

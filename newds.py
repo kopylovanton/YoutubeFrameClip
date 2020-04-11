@@ -6,7 +6,8 @@ import cv2
 print('cv2 version',cv2.__version__)
 import tkinter as tk
 #import tkinter.ttk as ttk
-
+from tensorflow.keras.applications.mobilenet_v2 import  preprocess_input
+import tensorflow as tf
 from  PIL import Image, ImageTk
 import datetime
 #import os
@@ -14,9 +15,10 @@ import pickle
 #import math
 import numpy as np
 
+
+
 class Application:
     def __init__(self):
-
         self.root = tk.Tk()  # initialize root window
         self.root.bind("<Key>", self.keyevent)
         self.root.title("PyImageSearch")  # set window title
@@ -48,6 +50,12 @@ class Application:
         self.maxs = tk.Entry(self.tframeB, text="Maximum S")
         self.maxs.insert(0, '500')
         self.maxs.grid(row=0, column=3)
+# use NN
+        #tk.Label(self.tframeB, text="Use NN:").grid(row=1)
+        self.isNN = tk.BooleanVar()
+        self.isNN.set(True)
+        self.isNNCheck = tk.Checkbutton(self.tframeB,text="Use NN", variable=self.isNN, onvalue=True, offvalue=False)
+        self.isNNCheck.grid(row=0,column=4)
 #start frame
         # tk.Label(self.tframeB, text="Start from 10%:").grid(row=0, column=4)
         # self.currf = tk.Entry(self.tframeB, text="Current time")
@@ -71,6 +79,10 @@ class Application:
         self.btns = tk.Button(self.tframeB, text="Skip Frame!", command=self.steps, height=2, width=10)
         self.btns.grid(row=2, column=4)
         self.stepf=1
+# # Zoom btn
+#         self.btnz = tk.Button(self.tframeB, text="Zoom 1x", command=self.zooms, height=2, width=10)
+#         self.btnz.grid(row=2, column=5)
+#         self.zoomf = 1
 # #Track btn
 #         self.btnt = tk.Button(self.tframeB, text="TrackIt!", command=self.trackit, height=2, width=10)
 #         self.btnt.grid(row=2, column=5)
@@ -83,7 +95,7 @@ class Application:
         self.buf['frame1']=None
         self.buf['countur_n'] = -1
         self.picked = []
-        self.nextpick= []
+        self.nextpicks= []
         self.backSub = cv2.createBackgroundSubtractorKNN()
 
         # start a self.video_loop that constantly pools the video sensor
@@ -95,7 +107,12 @@ class Application:
         if self.buf['frame1'] is not None:
             self.vs.release()  # release web camera
             cv2.destroyAllWindows()
-
+        if self.isNN.get():
+            # Load NN
+            mp = './KersModel.h5'
+            self.model = tf.keras.models.load_model(mp)
+            self.targetxy = (96, 96)
+            print('NN model loaded')
         """ Initialize application which uses OpenCV + Tkinter. It displays
             a video stream in a Tkinter window and stores current snapshot on disk """
         # Get youtube stream url by IDT
@@ -131,23 +148,36 @@ class Application:
     def Button1(self,event):
         if self.isPause:
             #print("clicked at", event.x, event.y)
+            falseframes=[]
+            self.nextpicks = []
+            trueframe = None
+            img = self.buf['frame1'].copy()
             for (i,(x, y, w, h)) in enumerate(self.buf['contoursFilered']):
                 #(x, y, w, h)=self.buf['contoursFilered'][i]
                 if 2*event.x>x-5 and 2*event.x<x+w+5:
                     if 2*event.y>y-5 and 2*event.y < y +h +5:
-                        img = self.buf['frame1'].copy()
                         self.buf['countur_n']=i
-                        (img1, crop_img) = self.__drawrect(img, self.buf['contoursFilered'][i],
+                        (img, crop_img) = self.__drawrect(img, self.buf['contoursFilered'][i],
                                                           (0, 255, 0))
-                        tf=crop_img.copy()
-                        self.schow_frame(tf, self.panelF)
-
-                        (img2, crop_img) = self.__drawrect(img1, self.buf['contoursFilered'][self.__nextframe()],
-                                                          (0, 0, 255))
-                        ff = crop_img.copy()
-                        self.nextpick=[ff,tf]
-                        self.schow_frame(img2, self.panel)
-                        break
+                        trueframe=crop_img.copy()
+                        self.schow_frame(trueframe, self.panelF)
+                        (img, crop_img) = self.__drawrect(img, self.buf['contoursFilered'][self.__nextframe()],
+                                                           (0, 255, 255))
+                        falseframes.append(crop_img.copy())
+                elif self.isNN.get():
+                    crop_img = self.buf['frame1'][y:y + h, x:x + w].copy()
+                    pr = self.model.predict(np.expand_dims(preprocess_input(cv2.cvtColor(cv2.resize(crop_img, self.targetxy), cv2.COLOR_BGR2RGB)), axis=0))
+                    if pr[0]>0.5:
+                        falseframes.append(crop_img)
+                        (img, crop_img) = self.__drawrect(img, self.buf['contoursFilered'][i],
+                                                           (0, 0, 255))
+                        cv2.putText(img, str(pr[0][0].round(2)), (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            if trueframe is not None:
+                for falseframe in falseframes:
+                    self.nextpicks.append([falseframe,trueframe])
+            else:
+                print('None picked, try again')
+            self.schow_frame(img, self.panel)
             #self.pause()
 
     def steps(self):
@@ -183,10 +213,11 @@ class Application:
             i = 0
         return i
     def pick(self):
-        if  self.isPause and len(self.nextpick)==2:
-            self.picked.append([1,self.nextpick[1]])
-            self.picked.append([0,self.nextpick[0]])
-            self.nextpick=[]
+        if  self.isPause and len(self.nextpicks)>0:
+            for p in self.nextpicks:
+                self.picked.append([0,p[0]])
+                self.picked.append([1,p[1]])
+            self.nextpicks=[]
             print('Picked {}'.format(len(self.picked)))
             if len(self.picked)%10==0:
                 self.take_snapshot()
@@ -286,10 +317,11 @@ class Application:
         for l in enumerate(self.buf['contoursFilered']):
             (x, y, w, h)=l[1]
             if fm[x,y]==1:
-                rectcolor = (0, 255, 255)
+                rectcolor = (255, 255, 255)
             else:
-                rectcolor = (0, 0, 255)
+                rectcolor = (0, 255, 255)
             cv2.rectangle(self.buf['frame_contur'], (x, y), (x + w, y + h), rectcolor, 2)
+
         return True
 
             # cv2.putText(self.buf['frame_contur'], "s={}".format(str(s)), (x + w + 5, y), cv2.FONT_HERSHEY_SIMPLEX,
