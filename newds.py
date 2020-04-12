@@ -76,7 +76,7 @@ class Application:
         self.btn = tk.Button(self.tframeB, text="Next Frame!", command=self.countur_loop, height=2, width=10)
         self.btn.grid(row=2, column=3)
 # STEP btn
-        self.btns = tk.Button(self.tframeB, text="Skip Frame!", command=self.steps, height=2, width=10)
+        self.btns = tk.Button(self.tframeB, text="Skip 100x!", command=self.steps, height=2, width=10)
         self.btns.grid(row=2, column=4)
         self.stepf=1
 # # Zoom btn
@@ -185,7 +185,7 @@ class Application:
             self.btns["text"] = "Skip 100x!"
             self.stepf = 100
         else:
-            self.btns["text"] = "Speed Frame!"
+            self.btns["text"] = "Normal play!"
             self.stepf = 1
 
     def pause(self):
@@ -197,7 +197,7 @@ class Application:
             else:
                 ret = True
             if ret:
-                self.btnp["text"] = "Pause!"
+                self.btnp["text"] = "Pause(space)!"
                 self.isPause = False
                 self.yadress.config(state='readonly')
             # # Number 2 defines flag CV_CAP_PROP_POS_FRAMES which is a 0-based index of the frame to be decoded/captured next.
@@ -205,7 +205,7 @@ class Application:
             # self.vs.set(2, frame_no);
         else:
             #self.yadress.config(state=tk.NORMAL)
-            self.btnp["text"] = "Resume!"
+            self.btnp["text"] = "Resume(space)!"
             self.isPause = True
     def __nextframe(self):
         i = self.buf['countur_n'] + 1
